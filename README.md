@@ -43,23 +43,78 @@ Read the bit stream through `Next`, or whole words through `Uint`. Do not treat
 successive `State` values as random: they are the same bits shifted along, so
 consecutive states overlap in all but one bit.
 
-### Tap masks
+## The two forms
+
+The module ships both classical constructions, behind one `lfsr.LFSR[W]`
+interface:
+
+| Package | Form      | Each clock                                                  |
+| ------- | --------- | ----------------------------------------------------------- |
+| `flfsr` | Fibonacci | folds every tapped bit into one feedback bit                |
+| `glfsr` | Galois    | shifts, and XORs the whole mask in when the top bit was set |
+
+Driven by the same polynomial **the two run the same sequence, only entering it
+at a different phase**. Neither is more random than the other, and on current
+hardware neither is faster: both clock in about 1.6 ns.
+
+That last point is worth stating, because the folklore says otherwise. Galois is
+usually sold as the cheaper form — one conditional XOR against Fibonacci's parity
+over the taps. Written the obvious way, with an `if`, it measures **2.5x
+slower**: the outgoing bit is a coin flip, so the branch mispredicts about half
+the time, while Fibonacci's supposedly expensive parity is a single branchless
+`POPCNT`. `glfsr` therefore applies its mask arithmetically rather than
+conditionally, which buys the difference back. Pick a form for the tap
+convention you already have, not for speed.
+
+### The masks are not interchangeable
+
+The two forms number their taps from opposite ends, so **one polynomial has two
+different masks**:
+
+| Polynomial                  | `flfsr` mask | `glfsr` mask |
+| --------------------------- | ------------ | ------------ |
+| `x^8 + x^4 + x^3 + x^2 + 1` | `0xB8`       | `0x1D`       |
+| `x^16 + x^5 + x^3 + x^2 + 1` | `0xB400`    | `0x2D`       |
+
+A Fibonacci mask has bit `i` set for the term `x^(n-1-i)`; a Galois mask has bit
+`j` set for the term `x^j`. They are bit reversals of each other, and
+`lfsr.ReverseMask` converts either way:
+
+```go
+import (
+    "github.com/1995parham/LFSR.go/glfsr"
+    "github.com/1995parham/LFSR.go/lfsr"
+)
+
+const fibonacci uint8 = 0xB8 // as flfsr spells x^8 + x^4 + x^3 + x^2 + 1
+
+g, err := glfsr.New(lfsr.ReverseMask(fibonacci), uint8(0x40)) // 0x1D
+```
+
+Handing one form the other's mask is **not** an error you will see: it is
+accepted, it runs, and it quietly gives a much shorter period, because the mask
+denotes a different and probably non-primitive polynomial. Convert, don't copy.
+
+## Tap masks
 
 `poly` is a mask over **register bit positions**, not a table of polynomial
-exponents. Because the register shifts up, mask bit `i` stands for the term
-`x^(n-1-i)`, where `n` is the register width. The `x^n` term is implicit — it is
-the feedback itself — and the polynomial's constant term lands on bit `n-1`.
-Every primitive polynomial has a constant term, so **the top bit of a usable
-mask is always set**.
+exponents. In `flfsr`, because the register shifts up, mask bit `i` stands for
+the term `x^(n-1-i)`, where `n` is the register width; the `x^n` term is
+implicit, being the feedback itself, and the polynomial's constant term lands on
+bit `n-1`. Every primitive polynomial has a constant term, so **the top bit of a
+usable `flfsr` mask is always set**. In `glfsr` the mask is simply the
+polynomial's low `n` coefficients, bit `j` meaning `x^j`, so its **bit 0** is
+the one always set.
 
-These four are primitive, so each reaches the maximal period of `2^n - 1`:
+These four polynomials are primitive, so each reaches the maximal period of
+`2^n - 1`:
 
-| Width | Polynomial                    | Taps (register bits) | Mask                 |
-| ----- | ----------------------------- | -------------------- | -------------------- |
-| 8     | `x^8 + x^4 + x^3 + x^2 + 1`   | 7, 5, 4, 3           | `0xB8`               |
-| 16    | `x^16 + x^5 + x^3 + x^2 + 1`  | 15, 13, 12, 10       | `0xB400`             |
-| 32    | `x^32 + x^22 + x^2 + x + 1`   | 31, 30, 29, 9        | `0xE0000200`         |
-| 64    | `x^64 + x^63 + x^61 + x^60 + 1` | 63, 3, 2, 0        | `0x800000000000000D` |
+| Width | Polynomial                      | `flfsr` mask         | `glfsr` mask         |
+| ----- | ------------------------------- | -------------------- | -------------------- |
+| 8     | `x^8 + x^4 + x^3 + x^2 + 1`     | `0xB8`               | `0x1D`               |
+| 16    | `x^16 + x^5 + x^3 + x^2 + 1`    | `0xB400`             | `0x2D`               |
+| 32    | `x^32 + x^22 + x^2 + x + 1`     | `0xE0000200`         | `0x00400007`         |
+| 64    | `x^64 + x^63 + x^61 + x^60 + 1` | `0x800000000000000D` | `0xB000000000000001` |
 
 `New` only rejects the degenerate masks; it does not verify primitivity, and a
 non-primitive polynomial simply gives a shorter period.
