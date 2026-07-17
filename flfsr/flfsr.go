@@ -65,7 +65,7 @@ func New[W lfsr.Word](poly, seed W) (*FLFSR[W], error) {
 
 // Next clocks the register once and reports the bit shifted out of the top.
 func (f *FLFSR[W]) Next() uint8 {
-	out := uint8(f.data>>(width[W]()-1)) & 1
+	out := uint8(f.data>>(lfsr.Width[W]()-1)) & 1
 
 	// A Fibonacci LFSR feeds back the XOR of every tapped bit, which is the
 	// parity of the tapped bits taken together.
@@ -79,7 +79,7 @@ func (f *FLFSR[W]) Next() uint8 {
 // word, most significant bit first.
 func (f *FLFSR[W]) Uint() W {
 	var v W
-	for range width[W]() {
+	for range lfsr.Width[W]() {
 		v = v<<1 | W(f.Next())
 	}
 
@@ -89,9 +89,4 @@ func (f *FLFSR[W]) Uint() W {
 // State reports the current register contents without clocking it.
 func (f *FLFSR[W]) State() W {
 	return f.data
-}
-
-// width reports the number of bits in W.
-func width[W lfsr.Word]() int {
-	return bits.Len64(uint64(^W(0)))
 }
