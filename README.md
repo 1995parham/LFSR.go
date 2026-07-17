@@ -91,23 +91,13 @@ const fibonacci uint8 = 0xB8 // as flfsr spells x^8 + x^4 + x^3 + x^2 + 1
 g, err := glfsr.New(lfsr.ReverseMask(fibonacci), uint8(0x40)) // 0x1D
 ```
 
-Handing one form the other's mask is **not** an error you will see: it is
-accepted, it runs, and it quietly gives a much shorter period, because the mask
-denotes a different and probably non-primitive polynomial. Convert, don't copy.
+Handing one form the other's mask is **not** an error you will see: it is accepted, it runs, and it quietly gives a much shorter period, because the mask denotes a different and probably non-primitive polynomial. Convert, don't copy.
 
 ## Tap masks
 
-`poly` is a mask over **register bit positions**, not a table of polynomial
-exponents. In `flfsr`, because the register shifts up, mask bit `i` stands for
-the term `x^(n-1-i)`, where `n` is the register width; the `x^n` term is
-implicit, being the feedback itself, and the polynomial's constant term lands on
-bit `n-1`. Every primitive polynomial has a constant term, so **the top bit of a
-usable `flfsr` mask is always set**. In `glfsr` the mask is simply the
-polynomial's low `n` coefficients, bit `j` meaning `x^j`, so its **bit 0** is
-the one always set.
+`poly` is a mask over **register bit positions**, not a table of polynomial exponents. In `flfsr`, because the register shifts up, mask bit `i` stands for the term `x^(n-1-i)`, where `n` is the register width; the `x^n` term is implicit, being the feedback itself, and the polynomial's constant term lands on bit `n-1`. Every primitive polynomial has a constant term, so **the top bit of a usable `flfsr` mask is always set**. In `glfsr` the mask is simply the polynomial's low `n` coefficients, bit `j` meaning `x^j`, so its **bit 0** is the one always set.
 
-These four polynomials are primitive, so each reaches the maximal period of
-`2^n - 1`:
+These four polynomials are primitive, so each reaches the maximal period of `2^n - 1`:
 
 | Width | Polynomial                      | `flfsr` mask         | `glfsr` mask         |
 | ----- | ------------------------------- | -------------------- | -------------------- |
@@ -116,27 +106,15 @@ These four polynomials are primitive, so each reaches the maximal period of
 | 32    | `x^32 + x^22 + x^2 + x + 1`     | `0xE0000200`         | `0x00400007`         |
 | 64    | `x^64 + x^63 + x^61 + x^60 + 1` | `0x800000000000000D` | `0xB000000000000001` |
 
-`New` only rejects the degenerate masks; it does not verify primitivity, and a
-non-primitive polynomial simply gives a shorter period.
+`New` only rejects the degenerate masks; it does not verify primitivity, and a non-primitive polynomial simply gives a shorter period.
 
 #### Borrowing masks from published tables
 
-Most published tap tables — [Wikipedia's LFSR article][wiki], Xilinx
-[XAPP052][], and Philip Koopman's [Maximal Length LFSR Feedback Terms][koopman],
-which covers every width from 4 to 64 bits — describe **right-shifting**
-registers, where mask bit `i` means `x^(i+1)`. A mask lifted from one of those
-and used here yields the *reciprocal* of the polynomial the table names.
+Most published tap tables — [Wikipedia's LFSR article][wiki], Xilinx [XAPP052][], and Philip Koopman's [Maximal Length LFSR Feedback Terms][koopman], which covers every width from 4 to 64 bits — describe **right-shifting** registers, where mask bit `i` means `x^(i+1)`. A mask lifted from one of those and used here yields the *reciprocal* of the polynomial the table names.
 
-That is harmless in practice: the reciprocal of a primitive polynomial is itself
-primitive and has the same period, so you still get `2^n - 1`. But the sequence
-is not the one the table describes, and the polynomial in the table is not the
-polynomial you are running. The 8- and 16-bit rows above are exactly this case —
-`0xB8` and `0xB400` are the familiar masks for `x^8 + x^6 + x^5 + x^4 + 1` and
-`x^16 + x^14 + x^13 + x^11 + 1`, and here they run those polynomials' reciprocals.
+That is harmless in practice: the reciprocal of a primitive polynomial is itself primitive and has the same period, so you still get `2^n - 1`. But the sequence is not the one the table describes, and the polynomial in the table is not the polynomial you are running. The 8- and 16-bit rows above are exactly this case — `0xB8` and `0xB400` are the familiar masks for `x^8 + x^6 + x^5 + x^4 + 1` and `x^16 + x^14 + x^13 + x^11 + 1`, and here they run those polynomials' reciprocals.
 
-To run a polynomial a table names, reverse its low `n` coefficients: `x^32 + x^22
-+ x^2 + x + 1` becomes mask `0xE0000200`, not the `0x80200003` a right-shifting
-implementation would use.
+To run a polynomial a table names, reverse its low `n` coefficients: `x^32 + x^22 + x^2 + x + 1` becomes mask `0xE0000200`, not the `0x80200003` a right-shifting implementation would use.
 
 [wiki]: https://en.wikipedia.org/wiki/Linear-feedback_shift_register
 [XAPP052]: https://docs.amd.com/v/u/en-US/xapp052
