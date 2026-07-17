@@ -1,8 +1,11 @@
-# LFSR.go
 
-[![CI](https://github.com/1995parham/LFSR.go/actions/workflows/ci.yml/badge.svg)](https://github.com/1995parham/LFSR.go/actions/workflows/ci.yml)
-[![Go Report](https://goreportcard.com/badge/github.com/1995parham/LFSR.go?style=flat-square)](https://goreportcard.com/report/github.com/1995parham/LFSR.go)
-[![Go Reference](https://pkg.go.dev/badge/github.com/1995parham/LFSR.go.svg)](https://pkg.go.dev/github.com/1995parham/LFSR.go)
+<h1 align="center">
+    LFSR.go
+</h1>
+
+<p align="center">
+    <img alt="GitHub Actions Workflow Status" src="https://img.shields.io/github/actions/workflow/status/1995parham/LFSR.go/ci.yml?style=for-the-badge&logo=github">
+</p>
 
 ## Introduction
 
