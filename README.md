@@ -85,6 +85,35 @@ g, err := glfsr.New(lfsr.ReverseMask(fibonacci), uint8(0x40)) // 0x1D
 
 Handing one form the other's mask is **not** an error you will see: it is accepted, it runs, and it quietly gives a much shorter period, because the mask denotes a different and probably non-primitive polynomial. Convert, don't copy.
 
+## Combining registers
+
+A lone LFSR is not a pseudo-random generator worth the name. It is linear, and that is fatal: Berlekamp-Massey recovers the entire feedback polynomial, and with it every future bit, from just `2n` bits of output. Combining registers is the reason anyone builds these at all.
+
+`prng` implements the **shrinking generator** of Coppersmith, Krawczyk and Mansour, which is what the C sample this module is based on demonstrates. Two registers clock together; the data register's bit is passed through when the clock register emits a one, and thrown away when it emits a zero:
+
+```go
+data, _ := flfsr.New[uint8](0xB8, 0x40)
+clock, _ := flfsr.New[uint8](0xB8, 0x17)
+
+g, err := prng.NewShrinking(data, clock)
+if err != nil {
+    return err
+}
+
+g.Next() // one surviving bit
+g.Uint() // eight of them, packed
+```
+
+The registers need not share a form or a width — a Fibonacci data register with a Galois clock is fine.
+
+### It is not cryptographically sound as built here
+
+The shrinking generator only reaches its full period of `(2^m - 1) * 2^(n-1)` when the two registers' periods are **coprime**, which requires `gcd(m, n) = 1` for register lengths `m` and `n`. This module ties a register's length to its word type, so the only lengths on offer are 8, 16, 32 and 64 — and `gcd` of any two of those is at least 8. **No pair is coprime**, so every generator built here falls short of its period.
+
+Badly, and measurably: an 8-bit pair repeats after **128 bits**, where a coprime pair would give 32640. That is 255x short, and `TestShortPeriodFromSharedFactors` pins it so the claim cannot rot.
+
+The C original sidesteps this by storing an arbitrary-degree polynomial in a fixed 64-bit word, which lets it choose coprime lengths like 17 and 19. Doing the same here means decoupling a polynomial's degree from its word type. Until then, treat `prng` as a demonstration of the construction, not as a source of secrets.
+
 ## Benchmarks
 
 ```console
