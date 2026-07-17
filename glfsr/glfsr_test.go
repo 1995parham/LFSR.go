@@ -17,6 +17,11 @@ const (
 	poly8 uint8 = 0x1D
 	// poly16 is x^16 + x^5 + x^3 + x^2 + 1, which flfsr spells 0xB400.
 	poly16 uint16 = 0x2D
+	// poly32 is x^32 + x^22 + x^2 + x + 1, which flfsr spells 0xE0000200.
+	poly32 uint32 = 0x00400007
+	// poly64 is x^64 + x^63 + x^61 + x^60 + 1, which flfsr spells
+	// 0x800000000000000D.
+	poly64 uint64 = 0xB000000000000001
 )
 
 func TestNewRejectsDegenerateArguments(t *testing.T) {

@@ -54,17 +54,9 @@ interface:
 | `glfsr` | Galois    | shifts, and XORs the whole mask in when the top bit was set |
 
 Driven by the same polynomial **the two run the same sequence, only entering it
-at a different phase**. Neither is more random than the other, and on current
-hardware neither is faster: both clock in about 1.6 ns.
-
-That last point is worth stating, because the folklore says otherwise. Galois is
-usually sold as the cheaper form — one conditional XOR against Fibonacci's parity
-over the taps. Written the obvious way, with an `if`, it measures **2.5x
-slower**: the outgoing bit is a coin flip, so the branch mispredicts about half
-the time, while Fibonacci's supposedly expensive parity is a single branchless
-`POPCNT`. `glfsr` therefore applies its mask arithmetically rather than
-conditionally, which buys the difference back. Pick a form for the tap
-convention you already have, not for speed.
+at a different phase**. Neither is more random than the other, and neither is
+meaningfully faster — see [Benchmarks](#benchmarks). Pick a form for the tap
+convention you already have.
 
 ### The masks are not interchangeable
 
@@ -93,6 +85,36 @@ g, err := glfsr.New(lfsr.ReverseMask(fibonacci), uint8(0x40)) // 0x1D
 
 Handing one form the other's mask is **not** an error you will see: it is accepted, it runs, and it quietly gives a much shorter period, because the mask denotes a different and probably non-primitive polynomial. Convert, don't copy.
 
+## Benchmarks
+
+```console
+$ go test ./... -bench . -benchtime=2s -count=3
+```
+
+Median of 3 runs on an 11th Gen Intel Core i5-1135G7, `linux/amd64`, Go 1.26. Nanoseconds per operation; every path is allocation free.
+
+`Next`, the cost of one bit:
+
+| Width | `flfsr` | `glfsr` |
+| ----- | ------- | ------- |
+| 8     | 1.94    | 1.38    |
+| 16    | 2.97    | 2.76    |
+| 32    | 1.60    | 1.66    |
+| 64    | 1.68    | 1.68    |
+
+`Uint`, the cost of one whole word, which is just `Next` run once per bit:
+
+| Width | `flfsr` | `glfsr` |
+| ----- | ------- | ------- |
+| 8     | 15.3    | 11.1    |
+| 64    | 98.0    | 87.6    |
+
+Two things in there are worth knowing.
+
+**The 16-bit row is not a typo.** Sixteen-bit registers really are about 1.8x slower per bit than 32- and 64-bit ones on this machine. That is not something this package does: the same gap appears in a bare loop doing nothing but a `uint16` shift and popcount, with no library code involved at all. It is a property of 16-bit arithmetic on amd64. If you want a narrow register and care about throughput, `uint8` is quick and `uint16` is not.
+
+**Galois is not the cheap form, despite the folklore.** It is usually sold as one conditional XOR against Fibonacci's parity over the taps. Written that obvious way it benchmarks at **3.89 ns**, well over twice the 1.66 ns it manages here, and slower than the Fibonacci form it is supposed to beat. The reason is that the outgoing bit is a coin flip, so the branch mispredicts about half the time, while Fibonacci's supposedly expensive parity is a single branchless `POPCNT`. `glfsr` applies its mask arithmetically instead, which buys the difference back. `BenchmarkNextBranchy` keeps the slow spelling around so the comparison stays honest.
+
 ## Tap masks
 
 `poly` is a mask over **register bit positions**, not a table of polynomial exponents. In `flfsr`, because the register shifts up, mask bit `i` stands for the term `x^(n-1-i)`, where `n` is the register width; the `x^n` term is implicit, being the feedback itself, and the polynomial's constant term lands on bit `n-1`. Every primitive polynomial has a constant term, so **the top bit of a usable `flfsr` mask is always set**. In `glfsr` the mask is simply the polynomial's low `n` coefficients, bit `j` meaning `x^j`, so its **bit 0** is the one always set.
@@ -108,7 +130,7 @@ These four polynomials are primitive, so each reaches the maximal period of `2^n
 
 `New` only rejects the degenerate masks; it does not verify primitivity, and a non-primitive polynomial simply gives a shorter period.
 
-#### Borrowing masks from published tables
+### Borrowing masks from published tables
 
 Most published tap tables — [Wikipedia's LFSR article][wiki], Xilinx [XAPP052][], and Philip Koopman's [Maximal Length LFSR Feedback Terms][koopman], which covers every width from 4 to 64 bits — describe **right-shifting** registers, where mask bit `i` means `x^(i+1)`. A mask lifted from one of those and used here yields the *reciprocal* of the polynomial the table names.
 
@@ -120,12 +142,9 @@ To run a polynomial a table names, reverse its low `n` coefficients: `x^32 + x^2
 [XAPP052]: https://docs.amd.com/v/u/en-US/xapp052
 [koopman]: https://users.ece.cmu.edu/~koopman/lfsr/index.html
 
-### Fibonacci LFSR
+## Reference
 
-`flfsr` implements the Fibonacci form: the register shifts towards its most
-significant bit, emitting the outgoing top bit, and feeds the parity of the
-tapped bits back into bit 0. The reference implementation for
-`x^16 + x^14 + x^13 + x^11 + 1`:
+The canonical Fibonacci LFSR, for `x^16 + x^14 + x^13 + x^11 + 1`:
 
 ```c
 # include <stdint.h>
