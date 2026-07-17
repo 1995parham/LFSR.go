@@ -11,10 +11,14 @@ import (
 // Maximal-length tap masks, i.e. primitive feedback polynomials, for the widths
 // exercised here.
 const (
-	// poly8 taps register bits 7, 5, 4, 3: x^8 + x^6 + x^5 + x^4 + 1.
+	// poly8 taps register bits 7, 5, 4, 3: x^8 + x^4 + x^3 + x^2 + 1.
 	poly8 uint8 = 0xB8
-	// poly16 taps register bits 15, 13, 12, 10: x^16 + x^14 + x^13 + x^11 + 1.
+	// poly16 taps register bits 15, 13, 12, 10: x^16 + x^5 + x^3 + x^2 + 1.
 	poly16 uint16 = 0xB400
+	// poly32 taps register bits 31, 30, 29, 9: x^32 + x^22 + x^2 + x + 1.
+	poly32 uint32 = 0xE0000200
+	// poly64 taps register bits 63, 3, 2, 0: x^64 + x^63 + x^61 + x^60 + 1.
+	poly64 uint64 = 0x800000000000000D
 )
 
 func TestNewRejectsDegenerateArguments(t *testing.T) {
@@ -190,12 +194,12 @@ func TestUintClocksWidthBits(t *testing.T) {
 
 	t.Run("32-bit", func(t *testing.T) {
 		t.Parallel()
-		assertUintClocks(t, uint32(0xA3000000), uint32(0xACE1ACE1), 32)
+		assertUintClocks(t, poly32, uint32(0xACE1ACE1), 32)
 	})
 
 	t.Run("64-bit", func(t *testing.T) {
 		t.Parallel()
-		assertUintClocks(t, uint64(0xD800000000000000), uint64(0xACE1ACE1ACE1ACE1), 64)
+		assertUintClocks(t, poly64, uint64(0xACE1ACE1ACE1ACE1), 64)
 	})
 }
 

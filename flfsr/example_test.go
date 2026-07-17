@@ -7,7 +7,7 @@ import (
 	"github.com/1995parham/LFSR.go/flfsr"
 )
 
-// Build an 8-bit register from the polynomial x^8 + x^6 + x^5 + x^4 + 1, whose
+// Build an 8-bit register from the polynomial x^8 + x^4 + x^3 + x^2 + 1, whose
 // taps on register bits 7, 5, 4 and 3 give the mask 0xB8, then read its bit
 // stream.
 func ExampleNew() {
@@ -25,7 +25,7 @@ func ExampleNew() {
 }
 
 // The width of the type argument picks the register width, so the same code
-// drives a 16-bit register built from x^16 + x^14 + x^13 + x^11 + 1.
+// drives a 16-bit register built from x^16 + x^5 + x^3 + x^2 + 1.
 //
 // Note the first word: a register shifts its seed out before it shifts anything
 // else, so the opening Uint of a freshly built register always reproduces the

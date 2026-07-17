@@ -35,11 +35,18 @@ var _ lfsr.LFSR[uint8] = (*FLFSR[uint8])(nil)
 // New builds a Fibonacci LFSR of the width of W.
 //
 // poly is a tap mask over register bit positions, not a table of polynomial
-// exponents: setting bit i taps register bit i, which stands for the term
-// x^(i+1) of the feedback polynomial. The implicit +1 term of the polynomial is
-// the incoming feedback bit and is never expressed in the mask. So the degree-8
-// polynomial x^8 + x^6 + x^5 + x^4 + 1 taps register bits 7, 5, 4 and 3, giving
-// poly 0xB8.
+// exponents. Because the register shifts up, mask bit i stands for the term
+// x^(n-1-i) of the feedback polynomial, where n is the width of W. The x^n term
+// is implicit, being the feedback itself, while the polynomial's constant term
+// lands on bit n-1; a primitive polynomial always has a constant term, so the
+// top bit of a usable mask is always set. Mask 0xB8 taps register bits 7, 5, 4
+// and 3, which is the degree-8 polynomial x^8 + x^4 + x^3 + x^2 + 1.
+//
+// Most published tap tables describe right-shifting registers. Such a mask used
+// here yields the reciprocal of the polynomial the table names. That costs
+// nothing in practice, since the reciprocal of a primitive polynomial is itself
+// primitive and has the same period, but it does mean the sequence is not the
+// one the table describes.
 //
 // Reaching the maximal period of 2^n - 1 requires poly to be primitive over
 // GF(2); New only rejects the degenerate masks, it does not check primitivity.
